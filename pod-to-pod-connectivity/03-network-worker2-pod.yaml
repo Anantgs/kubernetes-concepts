@@ -5,8 +5,13 @@ metadata:
 spec:
   nodeName: my-second-cluster-worker2
   containers:
-    - name: test
-      image: nicolaka/netshoot
-      command: ["/bin/bash"]
-      stdin: true
-      tty: true
+    - name: nginx
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+          name: http
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Hello from nginx on worker2" > /usr/share/nginx/html/index.html
+          nginx -g 'daemon off;'

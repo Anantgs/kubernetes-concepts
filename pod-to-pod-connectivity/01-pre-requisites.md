@@ -30,7 +30,44 @@ the pods are recreated.
 > existing pod-to-pod network. Installing and studying Cilium will be the next
 > stage.
 
-## 1. Verify the cluster
+## 1. Create the kind cluster
+
+Create a kind configuration file named `01-kind-config.yaml` with one control-plane node and two worker nodes:
+
+```yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
+```
+
+Then create the cluster:
+
+```bash
+kind create cluster --name my-second-cluster --config 01-kind-config.yaml
+```
+
+This creates a Kubernetes cluster with:
+
+- 1 control-plane node
+- 2 worker nodes
+- default kind networking enabled
+
+To verify the cluster was created successfully, list it:
+
+```bash
+kind get clusters
+```
+
+Expected output:
+
+```text
+my-second-cluster
+```
+
+## 2. Verify the cluster
 
 List the kind clusters:
 
@@ -84,7 +121,7 @@ All three nodes have the status `Ready`:
 These are node IP addresses on the kind Docker network. They are different
 from the `10.244.x.x` pod IP addresses that we will inspect later.
 
-## 2. Test pod manifests
+## 3. Test pod manifests
 
 The test pods are already deployed and running, so we do not need to recreate
 them.
@@ -102,7 +139,7 @@ kubectl apply -f 02-network-worker-pod.yaml
 kubectl apply -f 03-network-worker2-pod.yaml
 ```
 
-## 3. Verify pod placement and IP addresses
+## 4. Verify pod placement and IP addresses
 
 ```bash
 kubectl get pods test-pod-worker test-pod-worker2 -o wide
