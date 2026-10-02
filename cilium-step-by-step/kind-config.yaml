@@ -1,0 +1,13 @@
+# A dedicated kind cluster for learning Cilium.
+# Cilium will be installed as the cluster's CNI in the next step.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: cilium-lab
+networking:
+  disableDefaultCNI: true
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/16
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker

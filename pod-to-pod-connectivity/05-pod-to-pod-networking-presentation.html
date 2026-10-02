@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kubernetes Pod-to-Pod Networking Diagram</title>
+  <style>
+    :root {
+      --bg: #071321;
+      --panel: #10243a;
+      --panel2: #16324e;
+      --line: #314d67;
+      --text: #f3f8fc;
+      --muted: #a9bdd0;
+      --cyan: #4ad7ff;
+      --green: #52e6a5;
+      --yellow: #ffd166;
+      --purple: #ae8cff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1180px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    .page {
+      width: 100vw;
+      min-height: 100vh;
+      padding: 3.2vh 3.5vw 2.5vh;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 12% 4%, rgba(74, 215, 255, 0.12), transparent 24%),
+        radial-gradient(circle at 88% 94%, rgba(82, 230, 165, 0.08), transparent 26%),
+        linear-gradient(145deg, #071321, #0a1c2e);
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 2.2vh;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.1rem, 3.6vw, 4.2rem);
+      line-height: 1;
+      letter-spacing: -0.045em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: clamp(0.9rem, 1.25vw, 1.25rem);
+      text-align: right;
+      max-width: 420px;
+    }
+
+    .diagram {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.05fr 1.5fr 0.9fr 1.5fr 1.05fr;
+      align-items: stretch;
+      gap: 1.1vw;
+      min-height: 0;
+    }
+
+    .box {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(16, 36, 58, 0.94);
+      padding: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+    }
+
+    .box.pod-box { border-top: 5px solid var(--green); }
+    .box.worker-box { border-top: 5px solid var(--cyan); }
+    .box.network-box { border-top: 5px solid var(--yellow); }
+
+    .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-weight: 750;
+      font-size: clamp(0.66rem, 0.75vw, 0.85rem);
+    }
+
+    h2 {
+      margin: 0.35rem 0 0.8rem;
+      font-size: clamp(1.2rem, 1.7vw, 2rem);
+      line-height: 1.1;
+    }
+
+    h3 {
+      margin: 0 0 0.35rem;
+      color: var(--cyan);
+      font-size: clamp(0.83rem, 1vw, 1.08rem);
+    }
+
+    p { margin: 0; }
+
+    code {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: clamp(0.7rem, 0.86vw, 0.95rem);
+    }
+
+    .ip {
+      color: var(--green);
+      font-size: clamp(1.05rem, 1.42vw, 1.6rem);
+      font-weight: 800;
+      margin-bottom: 0.9rem;
+    }
+
+    .unit {
+      background: var(--panel2);
+      border: 1px solid rgba(169, 189, 208, 0.2);
+      border-radius: 13px;
+      padding: 0.72rem;
+      margin-top: 0.65rem;
+      line-height: 1.38;
+    }
+
+    .unit.route { border-left: 4px solid var(--purple); }
+    .unit.interface { border-left: 4px solid var(--cyan); }
+    .unit.arp { border-left: 4px solid var(--yellow); }
+
+    .connector {
+      position: absolute;
+      right: -1.55vw;
+      top: 50%;
+      width: 2vw;
+      height: 3px;
+      background: var(--yellow);
+      z-index: 5;
+    }
+
+    .connector::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -5px;
+      border-left: 9px solid var(--yellow);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+    }
+
+    .step {
+      position: absolute;
+      right: -0.95vw;
+      top: calc(50% - 25px);
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--yellow);
+      color: #071321;
+      font-size: 0.76rem;
+      font-weight: 900;
+      z-index: 6;
+    }
+
+    .network-box {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .network-line {
+      margin: 1rem auto;
+      width: 4px;
+      height: 12vh;
+      border-radius: 3px;
+      background: linear-gradient(var(--cyan), var(--yellow), var(--green));
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1fr;
+      gap: 1rem;
+      margin-top: 2vh;
+    }
+
+    .legend-item {
+      background: rgba(16, 36, 58, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      color: var(--muted);
+      font-size: clamp(0.72rem, 0.92vw, 1rem);
+      line-height: 1.42;
+    }
+
+    .legend-item strong { color: var(--text); }
+    .green { color: var(--green); }
+    .cyan { color: var(--cyan); }
+    .yellow { color: var(--yellow); }
+    .purple { color: var(--purple); }
+
+    .return-path {
+      margin-top: 1.2vh;
+      padding: 0.65rem 1rem;
+      border-radius: 12px;
+      border: 1px dashed var(--green);
+      text-align: center;
+      color: var(--muted);
+      font-size: clamp(0.72rem, 0.95vw, 1.02rem);
+    }
+
+    .return-path strong { color: var(--green); }
+
+    @media print {
+      @page { size: landscape; margin: 0; }
+      body { min-width: 0; }
+      .page {
+        width: 13.333in;
+        height: 7.5in;
+        min-height: 0;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div>
+        <div class="label">Kubernetes networking • before Cilium</div>
+        <h1>Cross-node pod-to-pod packet path</h1>
+      </div>
+      <p class="subtitle">A verified ICMP flow through two kind workers, their routes, veth pairs, and Docker network.</p>
+    </header>
+
+    <section class="diagram" aria-label="Pod-to-pod network path">
+      <article class="box pod-box">
+        <div>
+          <div class="label">Source namespace</div>
+          <h2>Pod 1</h2>
+          <p><code>test-pod-worker</code></p>
+          <p class="ip">10.244.2.8/24</p>
+        </div>
+        <div>
+          <div class="unit interface">
+            <h3>① Source interface</h3>
+            <code>2: eth0@if9</code><br>
+            <code>MAC be:8a:c1:78:cd:ea</code>
+          </div>
+          <div class="unit route">
+            <h3>② Pod route</h3>
+            <code>default via 10.244.2.1<br>dev eth0</code>
+          </div>
+        </div>
+        <span class="connector"></span><span class="step">1</span>
+      </article>
+
+      <article class="box worker-box">
+        <div>
+          <div class="label">kind node container</div>
+          <h2>Worker 1</h2>
+          <p class="ip">172.18.0.2/16</p>
+        </div>
+        <div>
+          <div class="unit interface">
+            <h3>③ Host side of veth</h3>
+            <code>9: vethb1135f87@if2</code><br>
+            <code>10.244.2.1/32</code>
+          </div>
+          <div class="unit route">
+            <h3>④ Cross-node route</h3>
+            <code>10.244.1.0/24<br>via 172.18.0.4 dev eth0</code>
+          </div>
+          <div class="unit arp">
+            <h3>⑤ ARP / neighbor</h3>
+            <code>172.18.0.4 →<br>66:0e:a9:11:f8:50</code>
+          </div>
+        </div>
+        <span class="connector"></span><span class="step">2</span>
+      </article>
+
+      <article class="box network-box">
+        <div>
+          <div class="label">Layer 2 transit</div>
+          <h2>kind Docker network</h2>
+          <p class="ip">172.18.0.0/16</p>
+        </div>
+        <div class="network-line"></div>
+        <div>
+          <p class="yellow"><strong>Ethernet frame</strong></p>
+          <p><code>dst MAC<br>66:0e:a9:11:f8:50</code></p>
+        </div>
+        <span class="connector"></span><span class="step">3</span>
+      </article>
+
+      <article class="box worker-box">
+        <div>
+          <div class="label">kind node container</div>
+          <h2>Worker 2</h2>
+          <p class="ip">172.18.0.4/16</p>
+        </div>
+        <div>
+          <div class="unit interface">
+            <h3>⑥ Packet arrives</h3>
+            <code>eth0</code><br>
+            <code>IP dst remains 10.244.1.12</code>
+          </div>
+          <div class="unit route">
+            <h3>⑦ Direct pod route</h3>
+            <code>10.244.1.12<br>dev veth191a351d</code>
+          </div>
+          <div class="unit route">
+            <h3>Reply subnet route</h3>
+            <code>10.244.2.0/24<br>via 172.18.0.2 dev eth0</code>
+          </div>
+        </div>
+        <span class="connector"></span><span class="step">4</span>
+      </article>
+
+      <article class="box pod-box">
+        <div>
+          <div class="label">Destination namespace</div>
+          <h2>Pod 2</h2>
+          <p><code>test-pod-worker2</code></p>
+          <p class="ip">10.244.1.12/24</p>
+        </div>
+        <div>
+          <div class="unit interface">
+            <h3>⑧ Final delivery</h3>
+            <p>Packet enters Pod 2 through its <code>eth0</code> interface.</p>
+          </div>
+          <div class="unit arp">
+            <h3>Verified result</h3>
+            <code>4 transmitted<br>4 received<br>0% packet loss</code>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="legend" aria-label="Diagram legend">
+      <div class="legend-item"><strong>Packet identity:</strong> source <span class="green">10.244.2.8</span> → destination <span class="green">10.244.1.12</span>. The destination pod IP is preserved across the nodes.</div>
+      <div class="legend-item"><span class="cyan">■ Interface/veth</span> connects namespaces. <span class="purple">■ Route</span> chooses the next hop or outgoing interface.</div>
+      <div class="legend-item"><span class="yellow">■ ARP</span> maps next-hop worker IP <code>172.18.0.4</code> to its MAC address for Ethernet delivery.</div>
+    </section>
+
+    <div class="return-path"><strong>Reply path:</strong> Pod 2 → <code>veth191a351d</code> → worker 2 → <code>10.244.2.0/24 via 172.18.0.2</code> → worker 1 → <code>vethb1135f87</code> → Pod 1</div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,133 @@
+# Cilium step-by-step lab
+
+This lab uses a dedicated three-node kind cluster. We deliberately create the
+cluster without kind's default CNI so that Cilium can become the cluster's pod
+network in the next step.
+
+## Step 1: Create a Cilium-ready kind cluster
+
+### Cluster configuration
+
+The cluster is defined in `kind-config.yaml`:
+
+```yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: cilium-lab
+networking:
+  disableDefaultCNI: true
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/16
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
+```
+
+Important details:
+
+- `disableDefaultCNI: true` prevents kindnet from being installed. The nodes
+  remain `NotReady` until we install Cilium.
+- `podSubnet` reserves `10.244.0.0/16` for pod IP addresses.
+- `serviceSubnet` reserves `10.96.0.0/16` for virtual Service IP addresses.
+- Repeating `role: worker` creates two uniquely named workers. `worker1` and
+  `worker2` are not valid kind roles.
+- We have not disabled `kube-proxy`. Initially, Cilium will provide pod
+  networking while kube-proxy continues to implement Kubernetes Services.
+
+### Create the cluster
+
+From the lab directory:
+
+```bash
+cd /mnt/d/Devops-concepts-videos/cilium-step-by-step
+kind create cluster --config kind-config.yaml
+```
+
+The successful creation output follows this pattern:
+
+```text
+Creating cluster "cilium-lab" ...
+ ✓ Ensuring node image (kindest/node:v1.37.0)
+ ✓ Preparing nodes
+ ✓ Writing configuration
+ ✓ Starting control-plane
+ ✓ Installing StorageClass
+ ✓ Joining worker nodes
+Set kubectl context to "kind-cilium-lab"
+```
+
+Kind creates Docker containers that behave as Kubernetes nodes and changes the
+current kubectl context to `kind-cilium-lab`.
+
+### Check the nodes
+
+```bash
+kubectl get node
+```
+
+Output captured immediately after cluster creation:
+
+```text
+NAME                       STATUS     ROLES           AGE   VERSION
+cilium-lab-control-plane   NotReady   control-plane   90s   v1.37.0
+cilium-lab-worker          NotReady   <none>          75s   v1.37.0
+cilium-lab-worker2         NotReady   <none>          75s   v1.37.0
+```
+
+`NotReady` is expected. Kubernetes adds a `node.kubernetes.io/not-ready` taint
+because the kubelet cannot find a working CNI configuration. Cilium will supply
+that configuration in Step 2.
+
+### Inspect node addresses and runtimes
+
+```bash
+kubectl get node -o wide
+```
+
+Output:
+
+```text
+NAME                       STATUS     ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION                              CONTAINER-RUNTIME
+cilium-lab-control-plane   NotReady   control-plane   94s   v1.37.0   172.18.0.7    <none>        Debian GNU/Linux 13 (trixie)   6.18.33.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.4
+cilium-lab-worker          NotReady   <none>          79s   v1.37.0   172.18.0.5    <none>        Debian GNU/Linux 13 (trixie)   6.18.33.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.4
+cilium-lab-worker2         NotReady   <none>          79s   v1.37.0   172.18.0.6    <none>        Debian GNU/Linux 13 (trixie)   6.18.33.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.4
+```
+
+The `172.18.0.x` addresses belong to the Docker network used by kind. They are
+node IPs, not pod IPs. Pods will later receive addresses from `10.244.0.0/16`.
+
+### Inspect the system pods
+
+```bash
+kubectl get po -n kube-system
+```
+
+Output:
+
+```text
+NAME                                               READY   STATUS    RESTARTS   AGE
+coredns-559f6c778d-jh4p5                           0/1     Pending   0          102s
+coredns-559f6c778d-zwlfg                           0/1     Pending   0          102s
+etcd-cilium-lab-control-plane                      1/1     Running   0          110s
+kube-apiserver-cilium-lab-control-plane            1/1     Running   0          110s
+kube-controller-manager-cilium-lab-control-plane   1/1     Running   0          110s
+kube-proxy-9hwnj                                   1/1     Running   0          102s
+kube-proxy-9tcdj                                   1/1     Running   0          98s
+kube-proxy-tmvpp                                   1/1     Running   0          98s
+kube-scheduler-cilium-lab-control-plane            1/1     Running   0          110s
+```
+
+The control-plane components use the host network, so they can run before a CNI
+exists. CoreDNS needs a pod network and therefore remains `Pending`. There is
+one kube-proxy pod per node because we are not replacing kube-proxy yet.
+
+Pod names, ages, IP addresses, and other dynamic values will differ when these
+commands are run again.
+
+## Current checkpoint
+
+The Kubernetes control plane is healthy, but pod networking is intentionally
+missing. Do not deploy applications yet. Step 2 will install Cilium and verify
+that the nodes and CoreDNS become ready.
+

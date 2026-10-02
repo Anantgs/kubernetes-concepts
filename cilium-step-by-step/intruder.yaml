@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: intruder
+  namespace: cilium-demo
+  labels:
+    app: intruder
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: cilium-lab-worker
+  containers:
+    - name: intruder
+      image: nicolaka/netshoot:v0.16
+      command: ["sh", "-c", "sleep infinity"]
