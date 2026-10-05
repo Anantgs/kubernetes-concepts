@@ -14,6 +14,18 @@ The source and destination pods are on different worker nodes. This makes the
 test useful for confirming that the cluster network routes pod traffic across
 nodes.
 
+## Get the CDR blocks
+
+```
+root@DESKTOP-AFTP8GF:/mnt/e/devops-drawing-tools/excalidraw#
+root@DESKTOP-AFTP8GF:/mnt/e/devops-drawing-tools/excalidraw# kubectl get nodes -o custom-columns="NAME:.metadata.name,INTERNAL_IP:.status.addresses[?(@.type=='InternalIP')].address,POD_CIDR:.spec.podCIDR"
+NAME                              INTERNAL_IP   POD_CIDR
+my-second-cluster-control-plane   172.18.0.4    10.244.0.0/24
+my-second-cluster-worker          172.18.0.2    10.244.1.0/24
+my-second-cluster-worker2         172.18.0.3    10.244.2.0/24
+root@DESKTOP-AFTP8GF:/mnt/e/devops-drawing-tools/excalidraw#
+```
+
 ## 1. Ping Pod 2 from Pod 1
 
 Command:
