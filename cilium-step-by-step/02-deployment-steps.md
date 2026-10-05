@@ -180,11 +180,56 @@ one kube-proxy pod per node because we are not replacing kube-proxy yet.
 Pod names, ages, IP addresses, and other dynamic values will differ when these
 commands are run again.
 
-## Current checkpoint
+## Step 2: Install Cilium as the pod-network CNI
 
-The Kubernetes control plane and Cilium are healthy. All three nodes are
-`Ready`, the three Cilium agents are running, and CoreDNS has pod addresses
-from `10.244.0.0/24`.
+Step 1 intentionally left the nodes `NotReady`: kind did not install its
+default CNI. Run the following from the **root shell** used to create the
+cluster. Check that the Cilium CLI is available and that kubectl points to
+this lab before installing anything:
+
+```bash
+cilium version --client
+kubectl config current-context
+# Expected context: kind-cilium-lab
+```
+
+If `cilium` is not installed, install the [Cilium CLI](https://github.com/cilium/cilium-cli#installation)
+system-wide first. The command below installs Cilium **into the cluster**;
+it does not install the CLI on your machine:
+
+```bash
+cilium install --context kind-cilium-lab --version 1.20.2 \
+  --set ipam.mode=kubernetes \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan \
+  --set kubeProxyReplacement=false \
+  --wait
+```
+
+This pins the Cilium version used in the lab. Kubernetes IPAM gives each
+node pod addresses from its assigned Pod CIDR. VXLAN carries cross-node pod
+traffic over the kind node network. We retain kube-proxy for Service
+forwarding, since Step 1 did not disable it. The CLI deploys the Cilium
+components and waits for them to become healthy. These are reproducible lab
+settings, not a recovered transcript of the original installation command.
+
+Verify the result:
+
+```bash
+cilium status --context kind-cilium-lab --wait
+kubectl --context kind-cilium-lab get nodes -o wide
+kubectl --context kind-cilium-lab -n kube-system get pods -l k8s-app=cilium -o wide
+kubectl --context kind-cilium-lab -n kube-system get pods -l k8s-app=kube-dns
+```
+
+Expect three `Ready` nodes, a running Cilium agent on each node, and running
+CoreDNS pods. The exact pod names and IP addresses will vary. If the nodes
+are still `NotReady`, inspect `cilium status` before continuing.
+
+## Checkpoint after Step 2
+
+With Cilium installed and healthy, all three nodes should be `Ready` and
+CoreDNS should have pod addresses from `10.244.0.0/16`.
 
 ## Next exercise: place two pods on different nodes
 
